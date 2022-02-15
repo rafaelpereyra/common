@@ -126,6 +126,20 @@ func (rt *sigV4RoundTripper) RoundTrip(req *http.Request) (*http.Response, error
 		return nil, fmt.Errorf("failed to sign request: %w", err)
 	}
 
+	// Check if credentials expires at all
+	_, err = rt.signer.Credentials.ExpiresAt()
+	if err == nil {
+		// Expiration is supported by the Provider
+		if rt.signer.Credentials.IsExpired() {
+			// Force re-read the credential file
+			_, err = rt.signer.Credentials.Get()
+			if err != nil {
+				return nil, fmt.Errorf("expired credentials used to sign request: %w", err)
+			}
+
+		}
+	}
+
 	// Copy over signed headers. Authorization header is not returned by
 	// rt.signer.Sign and needs to be copied separately.
 	for k, v := range headers {
